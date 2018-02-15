@@ -3,6 +3,10 @@ class IdeaBoxApp < Sinatra::Base
     register Sinatra::Reloader
   end
 
+  not_found do
+    erb :error
+  end
+
   get '/' do
     erb :index
   end
