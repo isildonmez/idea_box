@@ -11,7 +11,7 @@ class Idea
   def save
     database.transaction do |db|
       db['ideas'] ||= []
-      db['ideas'] << {title: title, description: description}
+      db['ideas'] << {title: @title, description: @description}
     end
   end
 
