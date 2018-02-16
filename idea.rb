@@ -15,7 +15,23 @@ class Idea
     end
   end
 
-  def database
+  def self.database
     @database ||= YAML::Store.new "ideabox"
+  end
+
+  def self.raw_ideas
+    raw_ideas = database.transaction do |db|
+      db['ideas'] || []
+    end
+  end
+
+  def self.all
+    raw_ideas.map do |data|
+      Idea.new(data[:title], data[:description])
+    end
+  end
+
+  def database
+    Idea.database
   end
 end
