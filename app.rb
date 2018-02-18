@@ -1,6 +1,7 @@
 require './idea'
 
 class IdeaBoxApp < Sinatra::Base
+  set :method_override, true
   configure :development do
     register Sinatra::Reloader
   end
@@ -19,6 +20,11 @@ class IdeaBoxApp < Sinatra::Base
     # 2. Store it
     idea.save
     # 3. Send us back to the index page to see all ideas
+    redirect '/'
+  end
+
+  delete '/:id' do |id|
+    Idea.delete(id.to_i)
     redirect '/'
   end
 

@@ -34,4 +34,10 @@ class Idea
   def database
     Idea.database
   end
+
+  def self.delete(position)
+    database.transaction do
+      database['ideas'].delete_at(position)
+    end
+  end
 end
