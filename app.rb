@@ -28,4 +28,8 @@ class IdeaBoxApp < Sinatra::Base
     redirect '/'
   end
 
+  get '/:id/edit' do |id|
+    "Edit an idea!"
+  end
+
 end
