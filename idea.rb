@@ -52,4 +52,14 @@ class Idea
     end
   end
 
+  def self.update(id, data)
+    database.transaction do
+      database['ideas'][id] = data
+    end
+  end
+
 end
+
+
+
+

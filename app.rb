@@ -34,7 +34,12 @@ class IdeaBoxApp < Sinatra::Base
   end
 
   put '/:id' do |id|
-    "Tweaking the IDEA!"
+    data = {
+      :title => params['idea_title'],
+      :description => params['idea_description']
+    }
+    Idea.update(id.to_i, data)
+    redirect '/'
   end
 
 end
