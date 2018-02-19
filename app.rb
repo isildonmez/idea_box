@@ -33,4 +33,8 @@ class IdeaBoxApp < Sinatra::Base
     erb :edit, locals: {id: id, idea: idea}
   end
 
+  put '/:id' do |id|
+    "Tweaking the IDEA!"
+  end
+
 end
