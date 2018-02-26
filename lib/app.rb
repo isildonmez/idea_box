@@ -1,8 +1,8 @@
-require './idea'
-require './idea_store'
+require 'idea_box'
 
 class IdeaBoxApp < Sinatra::Base
   set :method_override, true
+  set :root, 'lib/app'
 
   configure :development do
     register Sinatra::Reloader
@@ -33,6 +33,13 @@ class IdeaBoxApp < Sinatra::Base
 
   put '/:id' do |id|
     IdeaStore.update(id.to_i, params[:idea])
+    redirect '/'
+  end
+
+  post '/:id/like' do |id|
+    idea = IdeaStore.find(id.to_i)
+    idea.like!
+    IdeaStore.update(id.to_i, idea.to_h)
     redirect '/'
   end
 
