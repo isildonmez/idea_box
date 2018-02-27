@@ -146,11 +146,294 @@ gem 'shotgun'
 
 Then from the command line, run `shotgun`.
 
+#### Creating a Form
 
+Sinatra’s default `404` page, which is rendered whenever you submit a request which doesn’t have a matching route.
 
+Typically it means you:
 
+1. Didn’t define the route pattern at all
+2. Your method is using the wrong HTTP verb (ex: your method uses get, but the request is coming in as a post)
+3. The route pattern doesn’t match the request like you thought it did
 
+##### Create error page
 
+The default error page is pretty useless for debugging. Let’s create a better error page by defining `not_found` method in `app.rb`.
+
+##### Handling POST requests to /
+
+What should our POST / path actually do? Let’s write some pseudocode:
+
+```
+post '/' do
+  # 1. Create an idea based on the form parameters
+  # 2. Store it
+  # 3. Send us back to the index page to see all ideas
+  "Creating an IDEA!"
+end
+```
+
+## I2: Saving Ideas
+
+How should we save our data? Should we store it in memory, to a file, or to a database?
+
+Almost every web application is backed by a database that stores its data. We’re going to use an incredibly simple database that comes with Ruby called `YAML::Store` to store our ideas.
+
+```
+def save
+  database.transaction do |db|
+    db['ideas'] ||= []
+    db['ideas'] << {title: 'diet', description: 'pizza all the time'}
+  end
+end
+```
+Here our call to `database` is returning an instance of `YAML::Store`. The `YAML::Store` instance has a method named `transaction`. A transaction is a set of database operations that are grouped together. In this transaction we’re referring to the database with the local variable `db`, telling the database that there should be a collection named `ideas` or creating one and starting it as an empty set. Then we shovel an idea with fake data into that collection of `ideas`.
+
+```
+$ irb
+2.1.1 :001> require './idea'
+=> true
+2.1.1 :002> idea = Idea.new
+=> #<Idea:0x007f86fc04a0a8>
+2.1.1 :003> idea.save
+=> NameError: uninitialized constant Idea::YAML
+```
+Loading `idea.rb` goes fine, but when we try to save, it blows up in `save` when it calls the `database` method because it doesn’t know what `YAML` is.
+
+```
+2.1.1 :001> require 'yaml'
+2.1.1 :002> idea.save
+=> NameError: uninitialized constant Psych::Store
+```
+The thing we’re using in the `database` method, `YAML::Store`, is a wrapper around another library named `Psych::Store`. We can pull it in by requiring ‘yaml/store’:
+
+```
+2.1.1 :001> require 'yaml/store'
+2.1.1 :002> idea.save
+=> {title: 'diet', description: 'pizza all the time'}
+```
+
+#### Finding the Form Data
+
+Sinatra gives us a `params` method that returns an object holding the data we need.Let’s take a look at it by calling `inspect` and commenting out the rest of the `post '/'` block:
+
+```
+post '/' do
+  params.inspect
+  ## 1. Create an idea based on the form parameters
+  # idea = Idea.new
+  #
+  ## 2. Store it
+  # idea.save
+  #
+  ## 3. Send us back to the index page to see all ideas
+  # "Creating an IDEA!"
+end
+```
+Now go to localhost:4567 and fill in a new idea. Click submit, and the page shows you the following.
+
+```
+{"idea_title"=>"story", "idea_description"=>"a princess steals a spaceship"}
+```
+So we learn that the hash returned by `params` has keys `idea_title` and `idea_description`. Those names come the tags we defined in the HTML form.
+
+#### Using the Form Data
+
+```
+#...
+
+idea = Idea.new(params['idea_title'], params['idea_description'])
+
+#...
+```
+
+#### Redirecting after save
+
+The `redirect` method is provided by Sinatra. We give it a string parameter which is the path we want to redirect to. The redirect will come in as a `get` request.
+
+#### Querying for the ideas
+
+```
+get '/' do
+  erb :index, locals: {ideas: Idea.all}
+end
+```
+*This means render the ERB template named `index` and define in that scope the local variable named `ideas` with the value `Idea.all`*.
+
+#### Building Objects from a hash
+
+The view template is trying to call the `title` method on what it gets back from `.all`. But `all` is returning a collection of hashes with what `YAML::Store` returns. That hash has a key `:title`, but not a method `.title`.
+
+## I3: Deleting an Idea
+
+1. Adding a unique idefntifier
+2. Adding a delete button to index.erb
+3. Defining the Delete route
+
+##### Sinatra's `method_override`
+
+Sinatra is still looking for a `POST` route, not a `DELETE`. Sinatra knows about the workaround using the `_method` parameter, but we need to enable it.
+
+In your `app.rb` file add this line to the top of your class definition:
+
+```
+class IdeaBoxApp < Sinatra::Base
+  set :method_override, true
+
+  # ...
+end
+```
+
+Now Sinatra will pretend that the incoming request used the `DELETE` verb instead of `POST`.
+
+#### Add `delete` to Idea
+
+```
+class Idea
+  def self.delete(position)
+    database.transaction do
+      database['ideas'].delete_at(position)
+    end
+  end
+end
+```
+
+The `delete` method starts a transaction, accesses the `ideas` collection, then uses the `delete_at` method to remove the element at a certain position.
+
+This is an example of "duck typing." The `delete_at` method in `YAML::Store` is built to work like the `delete_at` method on `Array`.
+
+- HTTP requests are just made of strings. So when you use `params` in a Sinatra app, the values from the request are *always* strings. Our form is submitting the position as a parameter in the HTTP request. When we pass that parameter into the `delete` method the position is a string. But `delete_at` will only work with an integer. `id` needs to be an integer with the help of `.to_i`
+
+## I4: Editing an Idea
+
+1. Add an Edit Link
+2. Add the Edit Action
+3. Render an Edit Template
+3.a. Create the Edit template in the *views* directory named `edit.erb`
+
+```
+<html>
+  <head>
+    <title>IdeaBox</title>
+  </head>
+  <body>
+    <h1>IdeaBox</h1>
+
+    <form action="/<%= id %>" method="POST">
+      <p>
+        Edit your Idea:
+      </p>
+      <input type="hidden" name="_method" value="PUT" />
+      <input type='text' name='idea_title' value="<%= idea.title %>"/><br/>
+      <textarea name='idea_description'><%= idea.description %></textarea><br/>
+      <input type='submit'/>
+    </form>
+  </body>
+</html>
+```
+
+Again we’re creating a form which uses the `POST` method, and giving Sinatra the extra information in `_method=PUT` to say that even though this is coming in with the `POST` verb, we actually want it to be a `PUT`
+
+Then the form has `input` tags for the title and description. The `value` attribute uses the current values for the idea rather than having blank boxes.
+
+#### Setting up the `id`
+
+The `edit.erb` references `id` on line 8, but that local variable doesn’t exist. Jump back into the `app.rb` file and change the `get '/:id/edit'` method to specify a local variable named `id`:
+
+```
+get '/:id/edit' do |id|
+  erb :edit, locals: {id: id}
+end
+```
+
+The `locals: {id: id}` is saying "create a local variable for the ERB template with the name `id` which is a reference to the value in the `id` variable in this action’s scope."
+
+## I5: Refactoring Idea
+
+We've changed to make `Idea` take a hash by changing:
+- `initialize` method
+- class methods
+- `post` action
+- `index.erb`
+- `edit.erb` and `update` action
+
+##### Debugging a Type Issue
+
+If you look at the database file, some of the ideas look like this:
+
+```
+---
+ideas:
+- :title: dinner
+  :description: pizza
+- :title: dessert
+  :description: candy, soda, and ice cream
+```
+
+Whereas other ideas look like this:
+
+```
+---
+ideas:
+- title: dinner
+  description: pizza
+- title: dessert
+  description: candy, soda, and ice cream
+```
+
+Essentially, `:title:` is the YAML for the Ruby symbol `:title`, whereas `title:` is YAML for the Ruby string `"title"`.
+
+When the `params` object comes back, we send it directly to `Idea.update`. While we can access fields in the `params` using both strings and symbols for the keys, if we just grab the value of `params[:idea]`, we’ll get a hash with string values for the keys:
+
+```
+{"title" => "game", "description" => "tic tac toe"}
+```
+
+We can either jump through some hoops to deal with both strings and symbols, or change the update so we explicitly pass symbols to the database, or we can just use strings all the way through the app. Let’s just use strings.
+
+We need to update the `initialize` and `save` methods in `idea.rb` to use strings for the hash keys instead of symbols
+
+## I6: Using a View Layout
+
+Sinatra is automatically noticing existing `layout.erb` and wrapping the `index.erb` with the layout.
+
+However, to allow the content of the view template to actually be rendered, we need to add a call to yield inside the <body> tags like this:
+
+```
+<html>
+  <head>
+    <title>IdeaBox</title>
+  </head>
+  <body>
+    <%= yield %>
+  </body>
+</html>
+```
+
+If you view the HTML source in your browser, you’ll find that it has duplicated all the `<html>` and `<head>` tags. Open `index.erb` and `edit.erb` and delete all the wrapper which is in the layout. Now those view templates are just focused on what’s unique about that page.
+
+## I9: Ranking and Sorting
+
+#### Sorting Ideas
+
+We want to be able to sort ideas, so let’s include the Ruby `Comparable` module in `Idea`:
+
+```
+class Idea
+  include Comparable
+  # ...
+end
+```
+For `Comparable` to help us, we have to tell it how two ideas compare to each other. The way we do that is with the so-called spaceship operator, which looks like this: `<=>`.
+
+```
+def <=>(other)
+  rank <=> other.rank
+end
+```
+
+It turns out that our simplistic way of giving ideas an `id` based on their order in the list isn’t cutting it. The id in the index page is based on the sort order, whereas the id when we update an idea is based on the position of the idea in the database.
+Let’s have the database tell the idea what its id is when it gets pulled out.
 
 
 
