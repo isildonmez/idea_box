@@ -1,8 +1,5 @@
 ---
 ideas:
-- title: rick
-  description: I'm pickle riiick
-  rank: 9
-- title: avocado
-  description: you sexy thing!
-  rank: 8
+- !ruby/hash:Sinatra::IndifferentHash
+  title: 'rick '
+  description: I'm pickle riick
