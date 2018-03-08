@@ -27,6 +27,8 @@ class IdeaBoxApp < Sinatra::Base
 end
 ```
 
+> To understand Bundler's set-up process check this [link](https://www.brianstorti.com/understanding-bundler-setup-process/)
+
 ### What just happened?
 
 ```
